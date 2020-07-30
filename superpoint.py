@@ -280,15 +280,16 @@ class SuperPointFrontend(object):
                                       flags='nearest').squeeze(1)
 
       # Erode the count to ignore detections on the boundary
-      warped_count = self.erode(warped_count, kernel_size=3)
+      warped_count = self.erode(warped_count, kernel_size=3).unsqueeze(1)
 
       # Run the network on the warped images and mask them
-      warped_prob = self.net(warped_img)[0] * warped_count
+      with torch.no_grad():
+        warped_prob = self.net(warped_img)[0] * warped_count
 
       # Warp back and aggregate the results
       prob = warp_perspective(warped_prob, H_inv, (h, w))
       probs = torch.cat([probs, prob.reshape(b_size, mb_size, h, w)], dim=1)
-      count = warp_perspective(warped_count.unsqueeze(1), H_inv, (h, w))
+      count = warp_perspective(warped_count, H_inv, (h, w))
       counts = torch.cat([counts, count.reshape(b_size, mb_size, h, w)],
                           dim=1)
     
@@ -320,7 +321,8 @@ class SuperPointFrontend(object):
     if self.cuda:
       inp = inp.cuda()
     # Forward pass of network.
-    outs = self.net.forward(inp)
+    with torch.no_grad():
+      outs = self.net.forward(inp)
     heatmap, coarse_desc = outs[0], outs[1]
     if self.ha:
       # Homography adaptation
